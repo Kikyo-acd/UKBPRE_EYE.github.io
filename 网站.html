@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>眼科疾病风险预测工具</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+            margin-bottom: 25px;
+        }
+        .form-container {
+            background-color: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+            margin-bottom: 30px;
+        }
+        .results-container {
+            background-color: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+        }
+        .form-label {
+            font-weight: 600;
+            color: #333;
+        }
+        .form-text {
+            color: #6c757d;
+        }
+        .btn-primary {
+            background-color: #1890ff;
+            border-color: #1890ff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #096dd9;
+            border-color: #096dd9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(24, 144, 255, 0.3);
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #6c757d;
+        }
+        .risk-level {
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 30px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .risk-low {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .risk-medium {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .risk-high {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .info-card {
+            background-color: #e9f5fe;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .form-range {
+            cursor: pointer;
+        }
+        .form-range::-webkit-slider-thumb {
+            background: #1890ff;
+        }
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .factor-item {
+            border-left: 4px solid #1890ff;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+            border-radius: 0 4px 4px 0;
+        }
+        .factor-title {
+            font-weight: 600;
+            color: #333;
+        }
+        .factor-value {
+            color: #1890ff;
+            font-weight: 600;
+        }
+        .section-title {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 8px;
+            margin-top: 20px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .lifestyle-score-badge {
+            font-size: 14px;
+            margin-left: 10px;
+            padding: 3px 8px;
+            border-radius: 20px;
+        }
+        .lifestyle-unhealthy {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .lifestyle-intermediate {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .lifestyle-healthy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>眼科疾病风险预测工具</h1>
+            <p class="lead">基于英国生物银行数据训练的DeepSurv深度学习模型</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-5">
+                <div class="form-container">
+                    <h3 class="mb-4">个人信息输入</h3>
+                    <div class="info-card mb-4">
+                        <p class="mb-0"><strong>使用说明：</strong>该工具基于主要预测因素进行眼科疾病风险评估。每次修改输入后，系统会自动进行风险预测并生成图表。</p>
+                    </div>
+                    
+                    <form id="riskForm">
+                        <!-- 遗传风险部分 -->
+                        <h5 class="section-title">遗传风险信息</h5>
+                        
+                        <!-- 1. PRS_STANDARDIZED_COMBINED -->
+                        <div class="mb-3">
+                            <label for="prs_score" class="form-label">标准化遗传风险评分 (PRS)</label>
+                            <input type="range" class="form-range" id="prs_score" min="-3" max="3" step="0.1" value="0">
+                            <div class="d-flex justify-content-between">
+                                <small>-3 (低)</small>
+                                <small id="prs_score_value">0</small>
+                                <small>3 (高)</small>
+                            </div>
+                            <div class="form-text">遗传风险评分，数值越高表示遗传风险越高</div>
+                        </div>
+                        
+                        <!-- 2. 3. PRS类别（中等/高风险） -->
+                        <div class="mb-3">
+                            <label class="form-label">遗传风险类别</label>
+                            <select class="form-select" id="prs_category">
+                                <option value="low">低风险</option>
+                                <option value="medium" selected>中等风险</option>
+                                <option value="high">高风险</option>
+                            </select>
+                            <div class="form-text">基于遗传评分的风险分类</div>
+                        </div>
+                        
+                        <!-- 生活方式因素部分 -->
+                        <h5 class="section-title">生活方式因素 
+                            <span id="lifestyle_category_badge" class="badge lifestyle-score-badge lifestyle-intermediate">中等</span>
+                        </h5>
+                        
+                        <!-- 饮食因素 -->
+                        <div class="mb-3">
+                            <label class="form-label">健康饮食习惯</label>
+                            <select class="form-select" id="diet_score">
+                                <option value="0">不健康 (少于4项健康标准)</option>
+                                <option value="1" selected>健康 (4项或更多健康标准)</option>
+                            </select>
+                            <div class="form-text">健康标准包括：足够水果蔬菜、全谷物、鱼类，少加工肉类等</div>
+                        </div>
+                        
+                        <!-- 吸烟状态 -->
+                        <div class="mb-3">
+                            <label class="form-label">吸烟状态</label>
+                            <select class="form-select" id="smoking_score">
+                                <option value="0">现在或曾经吸烟</option>
+                                <option value="1" selected>从不吸烟</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 酒精摄入 -->
+                        <div class="mb-3">
+                            <label class="form-label">酒精摄入</label>
+                            <select class="form-select" id="alcohol_score">
+                                <option value="0">高风险摄入 (女性≥14g/天, 男性≥28g/天)</option>
+                                <option value="1" selected>低风险摄入 (女性<14g/天, 男性<28g/天)</option>
+                            </select>
+                            <div class="form-text">1标准杯≈12克酒精</div>
+                        </div>
+                        
+                        <!-- 身体活动与久坐 -->
+                        <div class="mb-3">
+                            <label class="form-label">身体活动与久坐行为</label>
+                            <select class="form-select" id="physical_activity_score">
+                                <option value="0">活动不足或久坐时间过长</option>
+                                <option value="1" selected>活动充分 (>3000 MET-分钟/周) 且久坐时间短 (≤2小时/天)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 睡眠时间 -->
+                        <div class="mb-3">
+                            <label class="form-label">睡眠时间</label>
+                            <select class="form-select" id="sleep_score">
+                                <option value="0">不足或过多 (<6小时或>8小时)</option>
+                                <option value="1" selected>充足 (6-8小时/天)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 生活方式总分 -->
+                        <div class="mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">生活方式评分</h6>
+                                    <p id="lifestyle_score_text" class="mb-1">总分: <span>5</span>/5</p>
+                                    <div class="progress">
+                                        <div id="lifestyle_score_bar" class="progress-bar bg-success" role="progressbar" style="width: 100%" 
+                                             aria-valuenow="5" aria-valuemin="0" aria-valuemax="5"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 其他健康指标 -->
+                        <h5 class="section-title">其他健康指标</h5>
+                        
+                        <!-- 5. townsendindex -->
+                        <div class="mb-3">
+                            <label for="townsend" class="form-label">Townsend贫困指数</label>
+                            <input type="range" class="form-range" id="townsend" min="-8" max="8" step="0.5" value="0">
+                            <div class="d-flex justify-content-between">
+                                <small>-8 (富裕)</small>
+                                <small id="townsend_value">0</small>
+                                <small>8 (贫困)</small>
+                            </div>
+                            <div class="form-text">衡量社会经济状况的指标</div>
+                        </div>
+                        
+                        <!-- 6. crf_d_yes -->
+                        <div class="mb-3">
+                            <label class="form-label">慢性肾病</label>
+                            <select class="form-select" id="crf_d">
+                                <option value="no" selected>否</option>
+                                <option value="yes">是</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 7. edu_unknown & 10. edu_uncollege -->
+                        <div class="mb-3">
+                            <label class="form-label">教育水平</label>
+                            <select class="form-select" id="education">
+                                <option value="college">大学及以上</option>
+                                <option value="uncollege" selected>大学以下</option>
+                                <option value="unknown">未知</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 8. bmi_group.0.0_1 -->
+                        <div class="mb-3">
+                            <label class="form-label">BMI分组</label>
+                            <select class="form-select" id="bmi_group">
+                                <option value="0">正常（BMI < 25）</option>
+                                <option value="1" selected>超重（BMI 25-30）</option>
+                                <option value="2">肥胖（BMI > 30）</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 9. hypertension_yes -->
+                        <div class="mb-3">
+                            <label class="form-label">高血压</label>
+                            <select class="form-select" id="hypertension">
+                                <option value="no" selected>否</option>
+                                <option value="yes">是</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 基本信息 -->
+                        <h5 class="section-title">基本信息</h5>
+                        
+                        <div class="mb-3">
+                            <label for="age" class="form-label">年龄</label>
+                            <input type="number" class="form-control" id="age" min="40" max="90" value="55">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">性别</label>
+                            <select class="form-select" id="sex">
+                                <option value="female" selected>女</option>
+                                <option value="male">男</option>
+                            </select>
+                        </div>
+                        
+                        <button type="button" class="btn btn-primary w-100 mt-4" id="predictButton">更新预测结果</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="col-md-7">
+                <div class="results-container">
+                    <h3 class="mb-4">风险预测结果</h3>
+                    
+                    <div id="summaryResults" class="mb-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">总体风险评估</h5>
+                                <p id="risk5year" class="mb-1">第5年累积风险: <span>待计算</span></p>
+                                <p id="risk10year" class="mb-1">第10年累积风险: <span>待计算</span></p>
+                                <div id="riskLevel" class="risk-level risk-medium">中等风险</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4>未来10年风险预测</h4>
+                    <p class="text-muted mb-4">基于5次模拟预测的风险区间</p>
+                    <div class="chart-container mb-4">
+                        <canvas id="riskChart"></canvas>
+                    </div>
+                    
+                    <h4>个性化风险解读</h4>
+                    <div id="factorAnalysis" class="mt-3 mb-4">
+                        <div class="d-flex align-items-center justify-content-center p-5">
+                            <p class="text-muted mb-0">请输入或调整左侧个人信息以获取风险解读</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">预防建议</h5>
+                            <ul>
+                                <li>定期进行眼科检查，特别是高风险人群（50岁以上或有家族史）</li>
+                                <li>保持健康生活方式，包括均衡饮食、规律运动</li>
+                                <li>控制慢性疾病，如高血压、糖尿病</li>
+                                <li>避免长时间用眼疲劳，定时休息</li>
+                                <li>佩戴防蓝光眼镜，减少电子屏幕对眼睛的伤害</li>
+                                <li>戒烟限酒，这些习惯会增加眼科疾病风险</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>© 2025 眼科疾病预测研究团队 | 基于英国生物银行数据和DeepSurv深度学习模型</p>
+            <p class="text-muted small">数据更新日期: 2025-04-17</p>
+        </div>
+    </div>
+    
+    <!-- 加载状态指示器 -->
+    <div class="loading" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+    </div>
+
+    <script>
+        // 初始化变量
+        let riskChart = null;
+        let lastPredictions = [];
+        
+        // 监听页面加载
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化范围滑块显示值
+            document.getElementById('prs_score_value').textContent = document.getElementById('prs_score').value;
+            document.getElementById('townsend_value').textContent = document.getElementById('townsend').value;
+            
+            // 监听范围滑块变化
+            document.getElementById('prs_score').addEventListener('input', function() {
+                document.getElementById('prs_score_value').textContent = this.value;
+                updatePredictions();
+            });
+            
+            document.getElementById('townsend').addEventListener('input', function() {
+                document.getElementById('townsend_value').textContent = this.value;
+                updatePredictions();
+            });
+            
+            // 监听生活方式因素变化
+            document.querySelectorAll('#diet_score, #smoking_score, #alcohol_score, #physical_activity_score, #sleep_score')
+            .forEach(element => {
+                element.addEventListener('change', function() {
+                    updateLifestyleScore();
+                    updatePredictions();
+                });
+            });
+            
+            // 监听其他输入变化
+            document.querySelectorAll('select, input[type="number"]').forEach(input => {
+                input.addEventListener('change', updatePredictions);
+            });
+            
+            // 预测按钮点击事件
+            document.getElementById('predictButton').addEventListener('click', updatePredictions);
+            
+            // 初始化图表
+            initChart();
+            
+            // 初始化生活方式评分
+            updateLifestyleScore();
+            
+            // 初始预测
+            updatePredictions();
+        });
+        
+        // 计算生活方式评分
+        function updateLifestyleScore() {
+            // 获取5个生活方式因素分数
+            const dietScore = parseInt(document.getElementById('diet_score').value);
+            const smokingScore = parseInt(document.getElementById('smoking_score').value);
+            const alcoholScore = parseInt(document.getElementById('alcohol_score').value);
+            const paScore = parseInt(document.getElementById('physical_activity_score').value);
+            const sleepScore = parseInt(document.getElementById('sleep_score').value);
+            
+            // 计算总分 (0-5分)
+            const totalScore = dietScore + smokingScore + alcoholScore + paScore + sleepScore;
+            
+            // 更新显示
+            document.querySelector('#lifestyle_score_text span').textContent = totalScore;
+            
+            // 更新进度条
+            const progressBar = document.getElementById('lifestyle_score_bar');
+            progressBar.style.width = (totalScore / 5 * 100) + '%';
+            progressBar.setAttribute('aria-valuenow', totalScore);
+            
+            // 根据分数设置进度条颜色和类别
+            const badge = document.getElementById('lifestyle_category_badge');
+            badge.classList.remove('lifestyle-unhealthy', 'lifestyle-intermediate', 'lifestyle-healthy');
+            progressBar.classList.remove('bg-danger', 'bg-warning', 'bg-success');
+            
+            let category = '';
+            if (totalScore <= 1) {
+                category = 'Unhealthy';
+                badge.classList.add('lifestyle-unhealthy');
+                badge.textContent = '不健康';
+                progressBar.classList.add('bg-danger');
+            } else if (totalScore <= 3) {
+                category = 'Intermediate';
+                badge.classList.add('lifestyle-intermediate');
+                badge.textContent = '中等';
+                progressBar.classList.add('bg-warning');
+            } else {
+                category = 'Healthy';
+                badge.classList.add('lifestyle-healthy');
+                badge.textContent = '健康';
+                progressBar.classList.add('bg-success');
+            }
+            
+            return {
+                score: totalScore,
+                category: category
+            };
+        }
+        
+        // 初始化图表
+        function initChart() {
+            const ctx = document.getElementById('riskChart').getContext('2d');
+            
+            riskChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['1年', '2年', '3年', '4年', '5年', '6年', '7年', '8年', '9年', '10年'],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: '风险概率'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100) + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '未来10年眼科疾病风险预测'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新预测
+        function updatePredictions() {
+            // 显示加载状态
+            document.querySelector('.loading').style.display = 'flex';
+            
+            // 获取所有输入值
+            const inputs = getFormInputs();
+            
+            // 清空上次预测结果
+            lastPredictions = [];
+            
+            // 模拟API调用延迟
+            setTimeout(() => {
+                // 进行5次预测
+                for (let i = 0; i < 5; i++) {
+                    const predictions = predictRisk(inputs);
+                    lastPredictions.push(predictions);
+                }
+                
+                // 更新图表
+                updateChart();
+                
+                // 更新风险总结
+                updateRiskSummary();
+                
+                // 更新因素分析
+                updateFactorAnalysis(inputs);
+                
+                // 隐藏加载状态
+                document.querySelector('.loading').style.display = 'none';
+            }, 700); // 模拟服务器延迟
+        }
+        
+        // 获取表单输入
+        function getFormInputs() {
+            // 获取生活方式评分
+            const lifestyleResult = updateLifestyleScore();
+            
+            return {
+                prs_score: parseFloat(document.getElementById('prs_score').value),
+                prs_category: document.getElementById('prs_category').value,
+                lifestyle_score: lifestyleResult.score,
+                lifestyle_category: lifestyleResult.category,
+                diet_score: parseInt(document.getElementById('diet_score').value),
+                smoking_score: parseInt(document.getElementById('smoking_score').value),
+                alcohol_score: parseInt(document.getElementById('alcohol_score').value),
+                physical_activity_score: parseInt(document.getElementById('physical_activity_score').value),
+                sleep_score: parseInt(document.getElementById('sleep_score').value),
+                townsend: parseFloat(document.getElementById('townsend').value),
+                crf_d: document.getElementById('crf_d').value,
+                education: document.getElementById('education').value,
+                bmi_group: document.getElementById('bmi_group').value,
+                hypertension: document.getElementById('hypertension').value,
+                age: parseInt(document.getElementById('age').value),
+                sex: document.getElementById('sex').value
+            };
+        }
+        
+        // 预测风险（模拟DeepSurv模型）
+        function predictRisk(inputs) {
+            /* 
+            在实际部署中，这里应该是调用后端API的函数，例如:
+            
+            async function predictRisk(inputs) {
+                try {
+                    const response = await fetch('/api/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(inputs)
+                    });
+                    const data = await response.json();
+                    return data.predictions;
+                } catch (error) {
+                    console.error('预测失败:', error);
+                    return Array(10).fill(0);
+                }
+            }
+            
+            下面是前端模拟预测模型的逻辑
+            */
+            
+            // 基础风险因子（根据模型实际情况调整）
+            let baseRisk = 0.02;
+            
+            // 遗传风险评分影响（最重要的特征）
+            baseRisk *= (1 + inputs.prs_score * 0.3);
+            
+            // 遗传风险类别
+            if (inputs.prs_category === 'medium') baseRisk *= 1.3;
+            if (inputs.prs_category === 'high') baseRisk *= 1.8;
+            
+            // 生活方式评分（总分0-5，得分越高风险越低）
+            // 根据生活方式类别
+            if (inputs.lifestyle_category === 'Unhealthy') {
+                baseRisk *= 1.5;
+            } else if (inputs.lifestyle_category === 'Intermediate') {
+                baseRisk *= 1.2;
+            } else { // Healthy
+                baseRisk *= 0.8;
+            }
+            
+            // 各个生活方式因素的单独影响（稍微调整以反映不同因素的权重）
+            if (inputs.diet_score === 0) baseRisk *= 1.1;  // 不健康饮食
+            if (inputs.smoking_score === 0) baseRisk *= 1.3; // 吸烟
+            if (inputs.alcohol_score === 0) baseRisk *= 1.15; // 高酒精摄入
+            if (inputs.physical_activity_score === 0) baseRisk *= 1.2; // 低身体活动
+            if (inputs.sleep_score === 0) baseRisk *= 1.1; // 不良睡眠
+            
+            // Townsend指数（越高表示越贫困，风险越高）
+            baseRisk *= (1 + inputs.townsend * 0.05);
+            
+            // 慢性肾病
+            if (inputs.crf_d === 'yes') baseRisk *= 1.4;
+            
+            // 教育水平
+            if (inputs.education === 'uncollege') baseRisk *= 1.1;
+            if (inputs.education === 'unknown') baseRisk *= 1.2;
+            
+            // BMI分组
+            if (inputs.bmi_group === '1') baseRisk *= 1.15;
+            if (inputs.bmi_group === '2') baseRisk *= 1.3;
+            
+            // 高血压
+            if (inputs.hypertension === 'yes') baseRisk *= 1.25;
+            
+            // 年龄（年龄每增加10岁，风险增加20%）
+            baseRisk *= (1 + (inputs.age - 55) * 0.02);
+            
+            // 性别
+            if (inputs.sex === 'male') baseRisk *= 0.9;
+            
+            // 加入随机变异（模拟模型的不确定性）
+            const randomFactor = 0.85 + Math.random() * 0.3;
+            baseRisk *= randomFactor;
+            
+            // 生成10年风险
+            const risks = [];
+            for (let year = 1; year <= 10; year++) {
+                // 风险随时间非线性增长
+                let yearRisk = baseRisk * Math.sqrt(year);
+                // 确保风险值在合理范围内
+                yearRisk = Math.min(Math.max(yearRisk, 0.01), 0.99);
+                risks.push(yearRisk);
+            }
+            
+            return risks;
+        }
+        
+        // 更新图表
+        function updateChart() {
+            if (lastPredictions.length === 0) return;
+            
+            // 转置数据，按年份组织
+            const yearData = Array(10).fill(0).map(() => []);
+            for (const prediction of lastPredictions) {
+                for (let i = 0; i < 10; i++) {
+                    yearData[i].push(prediction[i]);
+                }
+            }
+            
+            // 计算每年的均值和95%置信区间
+            const chartData = yearData.map(yearValues => {
+                const mean = yearValues.reduce((a, b) => a + b, 0) / yearValues.length;
+                const sorted = [...yearValues].sort((a, b) => a - b);
+                return {
+                    mean: mean,
+                    lower: sorted[0],
+                    upper: sorted[sorted.length - 1]
+                };
+            });
+            
+            // 更新图表数据
+            if (riskChart) {
+                riskChart.data.datasets = [{
+                    label: '平均风险',
+                    backgroundColor: 'rgba(24, 144, 255, 0.2)',
+                    borderColor: 'rgba(24, 144, 255, 1)',
+                    borderWidth: 2,
+                    data: chartData.map(d => d.mean),
+                    fill: false
+                }, {
+                    label: '风险范围',
+                    backgroundColor: 'rgba(24, 144, 255, 0.2)',
+                    borderColor: 'transparent',
+                    data: chartData.map(d => d.mean),
+                    fill: false,
+                    pointRadius: 0
+                }];
+                
+                // 添加误差带
+                riskChart.data.datasets[1].fill = {
+                    target: 'origin',
+                    above: 'rgba(24, 144, 255, 0.2)'
+                };
+                riskChart.data.datasets[1].pointRadius = 0;
+                
+                // 这里模拟箱线图的上下区间
+                riskChart.data.datasets.push({
+                    label: '风险上限',
+                    data: chartData.map(d => d.upper),
+                    borderColor: 'rgba(24, 144, 255, 0.5)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0
+                });
+                
+                riskChart.data.datasets.push({
+                    label: '风险下限',
+                    data: chartData.map(d => d.lower),
+                    borderColor: 'rgba(24, 144, 255, 0.5)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0
+                });
+                
+                riskChart.update();
+            }
+        }
+        
+        // 更新风险总结
+        function updateRiskSummary() {
+            if (lastPredictions.length === 0) return;
+            
+            // 计算第5年和第10年的平均风险
+            let risk5year = 0;
+            let risk10year = 0;
+            
+            for (const prediction of lastPredictions) {
+                risk5year += prediction[4]; // 第5年
+                risk10year += prediction[9]; // 第10年
+            }
+            
+            risk5year /= lastPredictions.length;
+            risk10year /= lastPredictions.length;
+            
+            // 更新显示
+            document.querySelector('#risk5year span').textContent = (risk5year * 100).toFixed(2) + '%';
+            document.querySelector('#risk10year span').textContent = (risk10year * 100).toFixed(2) + '%';
+            
+            // 判断风险等级
+            const riskLevel = document.getElementById('riskLevel');
+            riskLevel.classList.remove('risk-low', 'risk-medium', 'risk-high');
+            
+            if (risk10year < 0.1) {
+                riskLevel.textContent = '低风险';
+                riskLevel.classList.add('risk-low');
+            } else if (risk10year < 0.25) {
+                riskLevel.textContent = '中等风险';
+                riskLevel.classList.add('risk-medium');
+            } else {
+                riskLevel.textContent = '高风险';
+                riskLevel.classList.add('risk-high');
+            }
+        }
+        
+        // 更新因素分析
+        function updateFactorAnalysis(inputs) {
+            const factorDiv = document.getElementById('factorAnalysis');
+            
+            // 计算风险最终值
+            const predictions = lastPredictions[0]; // 使用第一组预测结果
+            const risk10year = predictions[9]; // 第10年风险
+            
+            // 格式化HTML内容
+            let html = '<div class="mb-4">';
+            
+            // 添加主要因素分析
+            html += '<h5>主要风险因素评估</h5>';
+            
+            // 构建生活方式因素分析
+            html += '<div class="card mb-3">';
+            html += '<div class="card-body">';
+            html += '<h6 class="card-title">生活方式分析</h6>';
+            
+            // 生活方式总体评估
+            html += `<p>您的生活方式评分为 <strong>${inputs.lifestyle_score}/5</strong>，属于 
+                    <span class="badge ${inputs.lifestyle_category === 'Healthy' ? 'bg-success' : 
+                                        (inputs.lifestyle_category === 'Intermediate' ? 'bg-warning' : 'bg-danger')}">
+                    ${inputs.lifestyle_category === 'Healthy' ? '健康' : 
+                      (inputs.lifestyle_category === 'Intermediate' ? '中等' : '不健康')}
+                    </span> 水平</p>`;
+            
+            // 生活方式各项因素
+            html += '<ul class="list-group list-group-flush">';
+            
+            // 饮食
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    饮食习惯
+                    <span class="badge ${inputs.diet_score === 1 ? 'bg-success' : 'bg-danger'}">
+                    ${inputs.diet_score === 1 ? '健康' : '不健康'}
+                    </span>
+                    </li>`;
+            
+            // 吸烟
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    吸烟状态
+                    <span class="badge ${inputs.smoking_score === 1 ? 'bg-success' : 'bg-danger'}">
+                    ${inputs.smoking_score === 1 ? '从不吸烟' : '现在或曾经吸烟'}
+                    </span>
+                    </li>`;
+            
+            // 酒精
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    酒精摄入
+                    <span class="badge ${inputs.alcohol_score === 1 ? 'bg-success' : 'bg-danger'}">
+                    ${inputs.alcohol_score === 1 ? '低风险' : '高风险'}
+                    </span>
+                    </li>`;
+            
+            // 身体活动
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    身体活动与久坐
+                    <span class="badge ${inputs.physical_activity_score === 1 ? 'bg-success' : 'bg-danger'}">
+                    ${inputs.physical_activity_score === 1 ? '活动充分' : '活动不足/久坐过多'}
+                    </span>
+                    </li>`;
+            
+            // 睡眠
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    睡眠时间
+                    <span class="badge ${inputs.sleep_score === 1 ? 'bg-success' : 'bg-danger'}">
+                    ${inputs.sleep_score === 1 ? '充足(6-8小时)' : '不足或过多'}
+                    </span>
+                    </li>`;
+            
+            html += '</ul>';
+            html += '</div></div>';
+            
+            // 评估其他风险因素
+            let factors = [];
+            
+            // 遗传风险
+            if (inputs.prs_score > 1 || inputs.prs_category === 'high') {
+                factors.push({
+                    name: '遗传风险',
+                    value: `PRS=${inputs.prs_score.toFixed(1)}`,
+                    impact: 0.9,
+                    description: '您的遗传风险较高，这是眼科疾病风险的重要影响因素'
+                });
+            } else if (inputs.prs_score > 0 || inputs.prs_category === 'medium') {
+                factors.push({
+                    name: '遗传风险',
+                    value: `PRS=${inputs.prs_score.toFixed(1)}`,
+                    impact: 0.6,
+                    description: '您的遗传风险处于中等水平'
+                });
+            }
+            
+            // 生活方式
+            if (inputs.lifestyle_score <= 1) {
+                factors.push({
+                    name: '生活方式',
+                    value: `${inputs.lifestyle_score}/5分`,
+                    impact: 0.85,
+                    description: '不健康的生活方式会显著增加眼科疾病风险'
+                });
+            } else if (inputs.lifestyle_score <= 3) {
+                factors.push({
+                    name: '生活方式',
+                    value: `${inputs.lifestyle_score}/5分`,
+                    impact: 0.6,
+                    description: '生活方式有改进空间，可降低眼科疾病风险'
+                });
+            }
+            
+            // 慢性肾病
+            if (inputs.crf_d === 'yes') {
+                factors.push({
+                    name: '慢性肾病',
+                    value: '有',
+                    impact: 0.8,
+                    description: '慢性肾病是增加眼科疾病风险的重要因素'
+                });
+            }
+            
+            // BMI
+            if (inputs.bmi_group === '2') {
+                factors.push({
+                    name: 'BMI状态',
+                    value: '肥胖',
+                    impact: 0.75,
+                    description: '肥胖会增加眼科疾病风险，建议减重'
+                });
+            } else if (inputs.bmi_group === '1') {
+                factors.push({
+                    name: 'BMI状态',
+                    value: '超重',
+                    impact: 0.5,
+                    description: '超重略微增加眼科疾病风险，建议控制体重'
+                });
+            }
+            
+            // 高血压
+            if (inputs.hypertension === 'yes') {
+                factors.push({
+                    name: '高血压',
+                    value: '有',
+                    impact: 0.7,
+                    description: '高血压会损害血管，增加眼科疾病风险'
+                });
+            }
+            
+            // 年龄
+            if (inputs.age > 65) {
+                factors.push({
+                    name: '年龄',
+                    value: `${inputs.age}岁`,
+                    impact: 0.65,
+                    description: '年龄是眼科疾病的主要不可改变风险因素'
+                });
+            }
+            
+            // 社会经济因素
+            if (inputs.townsend > 3) {
+                factors.push({
+                    name: '社会经济状况',
+                    value: `Townsend=${inputs.townsend.toFixed(1)}`,
+                    impact: 0.55,
+                    description: '社会经济状况较差可能影响医疗资源获取'
+                });
+            }
+            
+            // 按风险从高到低排序
+            factors.sort((a, b) => b.impact - a.impact);
+            
+            // 构建风险因素HTML
+            if (factors.length > 0) {
+                html += '<h5 class="mt-4">关键风险因素</h5>';
+                html += '<div class="mt-3">';
+                
+                for (const factor of factors) {
+                    html += `
+                    <div class="factor-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="factor-title">${factor.name}</span>
+                            <span class="factor-value">${factor.value}</span>
+                        </div>
+                        <div class="progress mt-1 mb-1" style="height: 6px;">
+                            <div class="progress-bar bg-${getColorByImpact(factor.impact)}" 
+                                 style="width: ${factor.impact * 100}%"></div>
+                        </div>
+                        <small class="text-muted">${factor.description}</small>
+                    </div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            // 添加保护因素
+            let protectiveFactors = [];
+            
+            if (inputs.lifestyle_score >= 4) {
+                protectiveFactors.push({
+                    name: '健康生活方式',
+                    value: `${inputs.lifestyle_score}/5分`,
+                    description: '健康的生活方式有助于降低眼科疾病风险'
+                });
+            }
+            
+            if (inputs.bmi_group === '0') {
+                protectiveFactors.push({
+                    name: '正常体重',
+                    value: 'BMI < 25',
+                    description: '保持健康体重有助于降低眼科疾病风险'
+                });
+            }
+            
+            if (inputs.hypertension === 'no') {
+                protectiveFactors.push({
+                    name: '血压正常',
+                    value: '无高血压',
+                    description: '正常血压有利于眼部健康'
+                });
+            }
+            
+            if (protectiveFactors.length > 0) {
+                html += '<h5 class="mt-4">保护因素</h5>';
+                html += '<ul class="list-group">';
+                
+                for (const factor of protectiveFactors) {
+                    html += `
+                    <li class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${factor.name}</strong>
+                            <p class="mb-0 small">${factor.description}</p>
+                        </div>
+                        <span class="badge bg-success">${factor.value}</span>
+                    </li>`;
+                }
+                
+                html += '</ul>';
+            }
+            
+            // 添加风险趋势分析
+            html += `
+            <div class="mt-4">
+                <h5>风险趋势分析</h5>
+                <p>根据您的个人信息，10年累积风险约为 <strong>${(risk10year * 100).toFixed(1)}%</strong>。
+                ${risk10year < 0.1 ? 
+                    '您的风险较低，建议保持健康生活方式，每1-2年进行一次常规眼科检查。' : 
+                    risk10year < 0.25 ? 
+                    '您的风险处于中等水平，建议每年进行一次眼科检查，并注意控制可改变的风险因素。' :
+                    '您的风险较高，建议每6个月进行一次眼科检查，严格控制风险因素，并咨询眼科专家。'
+                }</p>
+            </div>`;
+            
+            html += '</div>';
+            
+            factorDiv.innerHTML = html;
+        }
+        
+        // 根据影响度获取颜色
+        function getColorByImpact(impact) {
+            if (impact < 0.3) return 'success';
+            if (impact < 0.6) return 'warning';
+            return 'danger';
+        }
+    </script>
+</body>
+</html>
